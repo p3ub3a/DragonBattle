@@ -44,7 +44,7 @@ defmodule Dragon do
 
             # -------------------- skills --------------------
             {:whiptail, skillName} ->
-                dealDamage = &(Battle.getDamage/2)
+                getDamage = &(Battle.getDamage/2)
                 # ???
                 send(necromancerProcess, {:info, getDamage.(50, 100)})
                 # 
@@ -73,7 +73,7 @@ defmodule Necromancer do
 
             # -------------------- skills --------------------
             {:antiZombieBolt, skillName} ->
-                dealDamage = &(Battle.getDamage/2)
+                getDamage = &(Battle.getDamage/2)
                 # ???
                 send(dragonProcess, {:info, getDamage.(0, 1000)})
                 # 
