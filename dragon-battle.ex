@@ -5,11 +5,11 @@ defmodule Battle do
 
         Process.register(self(), :parentProcess)
 
-        dragonProcess = spawn(Dragon, :battle, [necromancerHp])
+        dragonProcess = spawn(Dragon, :battle, [dragonHp])
         Process.register(dragonProcess, :dragonProcess)
         dragonStrategyProcess = spawn(DragonStrategy, :useWhiptail, [])
 
-        necromancerProcess = spawn(Necromancer, :battle, [dragonHp])
+        necromancerProcess = spawn(Necromancer, :battle, [necromancerHp])
         Process.register(necromancerProcess, :necromancerProcess)
         necromancerStrategyProcess = spawn(NecromancerStrategy, :useAntiZombieBolt, [])
 
@@ -34,11 +34,11 @@ defmodule Dragon do
         
         receive do
             {:info, damageTaken} ->
+                dragonHp = dragonHp - damageTaken
                 if dragonHp <= 0 do 
                     send(:necromancerProcess, {:characterDead, "Dragon"})
                 else
-                    dragonHp = dragonHp - damageTaken
-                    IO.puts "The dragon took #{damageTaken} damage"
+                    IO.puts "The dragon took #{damageTaken} damage, dragon hp remaining: #{dragonHp}"
                 end
                 battle(dragonHp)
             {:characterDead, characterName} ->
@@ -66,11 +66,11 @@ defmodule Necromancer do
         
         receive do
             {:info, damageTaken} ->
+                necromancerHp = necromancerHp - damageTaken
                 if necromancerHp <= 0 do 
                     send(:dragonProcess, {:characterDead, "Necromancer"})
                 else
-                    necromancerHp = necromancerHp - damageTaken
-                    IO.puts "The necromancer took #{damageTaken} damage"
+                    IO.puts "The necromancer took #{damageTaken} damage, necromancerHp remaining #{necromancerHp}"
                 end
                 battle(necromancerHp)
             {:characterDead, characterName} ->
@@ -95,7 +95,7 @@ end
 defmodule DragonStrategy do
     def useWhiptail() do
         send(:dragonProcess, {:whiptail, "whiptail"}) 
-        Process.sleep(500)
+        Process.sleep(5)
         useWhiptail()
     end
 end
@@ -103,13 +103,13 @@ end
 defmodule NecromancerStrategy do
     def useAntiZombieBolt() do
         send(:necromancerProcess, {:antiZombieBolt, "anti zombie bolt"}) 
-        Process.sleep(1200)
+        Process.sleep(12)
         useAntiZombieBolt()
     end
 
     def summonZombieKnight() do
         send(:necromancerProcess, {:zombieKnight, "summon zombie knight"}) 
-        Process.sleep(2000)
+        Process.sleep(20)
         summonZombieKnight()
     end
 end
