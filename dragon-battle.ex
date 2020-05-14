@@ -3,13 +3,15 @@ defmodule Battle do
         necromancerHp = 10000
         dragonHp = 1000000
 
-        parentProcess = self()
+        Process.register(self(), :parentProcess)
 
-        dragonProcess = spawn(Dragon, :battle, [necromancerHp, parentProcess])
-        dsp = spawn(DragonStrategy, :useWhiptail, [dragonProcess])
+        dragonProcess = spawn(Dragon, :battle, [necromancerHp])
+        Process.register(dragonProcess, :dragonProcess)
+        dragonStrategyProcess = spawn(DragonStrategy, :useWhiptail, [])
 
-        necromancerProcess = spawn(Necromancer, :battle, [dragonHp, parentProcess])
-        nsp = spawn(NecromancerStrategy, :useAntiZombieBolt, [necromancerProcess])
+        necromancerProcess = spawn(Necromancer, :battle, [dragonHp])
+        Process.register(necromancerProcess, :necromancerProcess)
+        necromancerStrategyProcess = spawn(NecromancerStrategy, :useAntiZombieBolt, [])
 
         receive do
             {:gameOver, message } -> 
@@ -27,87 +29,93 @@ defmodule Battle do
 end
 
 defmodule Dragon do
-    def battle(dragonHp, parentProcess) do
-        process = self()
+    def battle(dragonHp) do
         # enemyList = 
         
         receive do
             {:info, damageTaken} ->
                 if dragonHp <= 0 do 
-                    send(parentProcess, {:gameOver, "The necromancer won the battle!"})
+                    send(:necromancerProcess, {:characterDead, "Dragon"})
                 else
                     dragonHp = dragonHp - damageTaken
                     IO.puts "The dragon took #{damageTaken} damage"
                 end
-                battle(dragonHp, parentProcess)
+                battle(dragonHp)
             {:characterDead, characterName} ->
-
+                IO.puts "#{characterName} was defeated!"
+                if(characterName == "Necromancer") do
+                    send(:parentProcess, {:gameOver, "The dragon won the battle!"})
+                end
+                battle(dragonHp)
             # -------------------- skills --------------------
             {:whiptail, skillName} ->
                 getDamage = &(Battle.getDamage/2)
-                # ???
-                send(necromancerProcess, {:info, getDamage.(50, 100)})
-                # 
-                battle(dragonHp, parentProcess)
-            {:dragonBreath, skillName} ->
+                damage = getDamage.(50, 100)
+                send(:necromancerProcess, {:info, damage})
+                IO.puts "Dragon used #{skillName} for #{damage} damage"
+                battle(dragonHp)
+            #{:dragonBreath, skillName} ->
 
         end
     end
 end
 
 defmodule Necromancer do
-    def battle(necromancerHp, parentProcess) do
-        process = self()
+    def battle(necromancerHp) do
         # enemyList = 
         
         receive do
             {:info, damageTaken} ->
                 if necromancerHp <= 0 do 
-                    send(parentProcess, {:gameOver, "The dragon won the battle!"})
+                    send(:dragonProcess, {:characterDead, "Necromancer"})
                 else
                     necromancerHp = necromancerHp - damageTaken
                     IO.puts "The necromancer took #{damageTaken} damage"
                 end
-                battle(necromancerHp, parentProcess)
+                battle(necromancerHp)
             {:characterDead, characterName} ->
-
+                IO.puts "#{characterName} was defeated!"
+                if(characterName == "Dragon") do
+                    send(:parentProcess, {:gameOver, "The necromancer won the battle!"})
+                end
+                battle(necromancerHp)
             # -------------------- skills --------------------
             {:antiZombieBolt, skillName} ->
                 getDamage = &(Battle.getDamage/2)
-                # ???
-                send(dragonProcess, {:info, getDamage.(0, 1000)})
-                # 
-                battle(necromancerHp, parentProcess)
-            {:zombieKnight, skillName} ->
+                damage = getDamage.(0, 1000)
+                send(:dragonProcess, {:info, damage})
+                IO.puts "Necromancer used #{skillName} for #{damage} damage"
+                battle(necromancerHp)
+            #{:zombieKnight, skillName} ->
                 
         end
     end
 end
 
 defmodule DragonStrategy do
-    def useWhiptail(dragonProcess) do
-        send(dragonProcess, {:whiptail, "whiptail"}) 
-        Process.sleep(5)
-        useWhiptail(dragonProcess)
+    def useWhiptail() do
+        send(:dragonProcess, {:whiptail, "whiptail"}) 
+        Process.sleep(500)
+        useWhiptail()
     end
 end
 
 defmodule NecromancerStrategy do
-    def useAntiZombieBolt(necromancerProcess) do
-        send(necromancerProcess, {:antiZombieBolt, "anti zombie bolt"}) 
-        Process.sleep(12)
-        useAntiZombieBolt(necromancerProcess)
+    def useAntiZombieBolt() do
+        send(:necromancerProcess, {:antiZombieBolt, "anti zombie bolt"}) 
+        Process.sleep(1200)
+        useAntiZombieBolt()
     end
 
-    def summonZombieKnight(necromancerProcess) do
-        send(necromancerProcess, {:zombieKnight, "summon zombie knight"}) 
-        Process.sleep(20)
-        summonZombieKnight(necromancerProcess)
+    def summonZombieKnight() do
+        send(:necromancerProcess, {:zombieKnight, "summon zombie knight"}) 
+        Process.sleep(2000)
+        summonZombieKnight()
     end
 end
 
-defmodule ZombieKnight do
-    receive do
+# defmodule ZombieKnight do
+#     receive do
             
-    end
-end
+#     end
+# end
