@@ -45,9 +45,8 @@ defmodule Dragon do
                 if(characterName == "Necromancer") do
                     send(:parentProcess, {:gameOver, "The dragon won the battle!"})
                 else
-                    List.delete(zkList, characterName)
+                    battle(dragonHp, List.delete(zkList, characterName))
                 end
-                battle(dragonHp, zkList)
             {:updateZkList, updatedZkList} ->
                 battle(dragonHp, updatedZkList)
 
@@ -89,9 +88,9 @@ defmodule Necromancer do
                     IO.puts "#{characterName} was defeated!"
                     send(:parentProcess, {:gameOver, "The necromancer won the battle!"})
                 else
-                    List.delete(zombieKnights, characterName)
+                    battle(necromancerHp, List.delete(zombieKnights, characterName))
                 end
-                battle(necromancerHp, zombieKnights)
+                
             # -------------------- skills --------------------
             {:antiZombieBolt, skillName} ->
                 getDamage = &(Battle.getDamage/2)
@@ -104,7 +103,7 @@ defmodule Necromancer do
                 zkID = generateZKID(zombieKnights)
 
                 zkProcess = spawn(ZombieKnight, :battle, [zombieKnightHp, zkID])
-                zkSwordSlashProcess = spawn(ZombieKnight, :useSwordSlash, [])
+                zkSwordSlashProcess = spawn(ZombieKnight, :useSwordSlash, [zkID])
                 Process.register(zkProcess, :"ZK_#{zkID}")
                 Process.register(zkSwordSlashProcess, :"ZK_SS_#{zkID}")
 
@@ -129,7 +128,7 @@ end
 defmodule DragonStrategy do
     def useWhiptail() do
         send(:dragonProcess, {:whiptail, "whiptail"}) 
-        Process.sleep(500)
+        Process.sleep(5)
         useWhiptail()
     end
 end
@@ -142,13 +141,13 @@ defmodule NecromancerStrategy do
 
     def useAntiZombieBolt() do
         send(:necromancerProcess, {:antiZombieBolt, "anti zombie bolt"}) 
-        Process.sleep(1200)
+        Process.sleep(12)
         useAntiZombieBolt()
     end
 
     def summonZombieKnight() do
         send(:necromancerProcess, {:summonZombieKnight, "summon zombie knight"}) 
-        Process.sleep(2000)
+        Process.sleep(20)
         summonZombieKnight()
     end
 end
@@ -161,8 +160,8 @@ defmodule ZombieKnight do
                 if zombieKnightHp <= 0 do 
                     send(:necromancerProcess, {:characterDead, zkID})
                     send(:dragonProcess, {:characterDead, zkID})
-                    Process.exit(:"ZK_#{zkID}", :kill)
-                    Process.exit(:"ZK_SS_#{zkID}", :kill)
+                    Process.exit(Process.whereis(:"ZK_#{zkID}"), :info)
+                    Process.exit(Process.whereis(:"ZK_SS_#{zkID}"), :info)
                 else
                     IO.puts "ZK_#{zkID} took #{damageTaken} damage, ZK_#{zkID} has #{zombieKnightHp} remaining"
                     battle(zombieKnightHp, zkID)
@@ -170,12 +169,12 @@ defmodule ZombieKnight do
         end
     end
 
-    def useSwordSlash() do
+    def useSwordSlash(zkID) do
         getDamage = &(Battle.getDamage/2)
         damage = getDamage.(20, 50)
         send(:dragonProcess, {:info, damage})
-        IO.puts "Zombie knight used sword slash for #{damage} damage"
-        Process.sleep(500)
+        IO.puts "Zombie knight #{zkID} used sword slash for #{damage} damage"
+        Process.sleep(5)
         useSwordSlash()
     end
 end
