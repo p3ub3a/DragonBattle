@@ -47,8 +47,8 @@ defmodule Dragon do
                 else
                     battle(dragonHp, List.delete(zkList, characterName))
                 end
-            {:updateZkList, updatedZkList} ->
-                battle(dragonHp, updatedZkList)
+            {:updateZkList, newZombieKnight} ->
+                battle(dragonHp, zkList ++ [newZombieKnight])
 
             # -------------------- skills --------------------
             {:whiptail, skillName} ->
@@ -108,7 +108,7 @@ defmodule Necromancer do
                 Process.register(zkSwordSlashProcess, :"ZK_SS_#{zkID}")
 
                 zombieKnights = zombieKnights ++ [zkID]
-                send(:dragonProcess, {:updateZkList, zombieKnights})
+                send(:dragonProcess, {:updateZkList, zkID})
 
                 IO.puts "Necromancer used #{skillName} and has an army size of: #{Enum.count(zombieKnights)} zombie knights"
                 battle(necromancerHp, zombieKnights)
