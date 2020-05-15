@@ -175,6 +175,6 @@ defmodule ZombieKnight do
         send(:dragonProcess, {:info, damage})
         IO.puts "Zombie knight #{zkID} used sword slash for #{damage} damage"
         Process.sleep(5)
-        useSwordSlash()
+        useSwordSlash(zkID)
     end
 end
