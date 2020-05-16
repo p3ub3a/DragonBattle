@@ -11,7 +11,7 @@ defmodule Battle do
 
         necromancerProcess = spawn(Necromancer, :battle, [necromancerHp, [], []])
         Process.register(necromancerProcess, :necromancerProcess)
-        necromancerStrategyProcess = spawn(NecromancerStrategy, :useSkills, [])
+        necromancerStrategyProcess = spawn(NecromancerStrategy, :useSkill, [])
 
         receive do
             {:gameOver, message } -> 
@@ -57,7 +57,7 @@ defmodule Dragon do
                 IO.puts "#{characterName} was defeated!"
                 if(characterName == "Necromancer") do
                     spawn(Battle, :shutdownProcesses, [zkList, zaList])
-                    send(:parentProcess, {:gameOver, "The dragon won the battle!"})
+                    send(:parentProcess, {:gameOver, "The dragon won the battle with #{dragonHp} hp remaining!"})
                 else
                     battle(dragonHp, List.delete(zkList, characterName), List.delete(zaList, characterName))
                 end
@@ -109,7 +109,7 @@ defmodule Necromancer do
             {:characterDead, characterName} ->
                 if(characterName == "Dragon") do
                     IO.puts "#{characterName} was defeated!"
-                    send(:parentProcess, {:gameOver, "The necromancer won the battle!"})
+                    send(:parentProcess, {:gameOver, "The necromancer won the battle with #{necromancerHp} hp remaining!"})
                 else
                     battle(necromancerHp, List.delete(zombieKnights, characterName), List.delete(zombieArchers, characterName))
                 end
@@ -171,28 +171,30 @@ defmodule DragonStrategy do
 end
 
 defmodule NecromancerStrategy do
-    def useSkills() do
-        spawn(NecromancerStrategy, :useAntiZombieBolt, [])
-        spawn(NecromancerStrategy, :summonZombieKnight, [])
-        spawn(NecromancerStrategy, :summonZombieArcher, [])
+    def useSkill() do
+        skillNr = :rand.uniform(3)
+        case skillNr do
+            1 -> useAntiZombieBolt()
+            2 -> summonZombieKnight()
+            3 -> summonZombieArcher()
+            _ -> "invalid skill number"
+        end
+        useSkill()
     end
 
     def useAntiZombieBolt() do
         send(:necromancerProcess, {:antiZombieBolt, "anti zombie bolt"}) 
         Process.sleep(12)
-        useAntiZombieBolt()
     end
 
     def summonZombieKnight() do
         send(:necromancerProcess, {:summonZombieKnight, "summon zombie knight"}) 
         Process.sleep(20)
-        summonZombieKnight()
     end
 
     def summonZombieArcher() do
         send(:necromancerProcess, {:summonZombieArcher, "summon zombie archer"}) 
         Process.sleep(20)
-        summonZombieArcher()
     end
 end
 
