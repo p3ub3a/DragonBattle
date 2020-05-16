@@ -6,8 +6,8 @@ Dragon starting hit points: 1 000 000
 
 The dragon knows two spells: 
 
-- **Whiptail** (5ms) cleaves one target for 50-100 hit points. *There is a 20% chance for **DragonBreath** to be used instead (**to be implemented**)*;
-- **DragonBreath** hits all targets for 50-150 hit points *(**to be implemented**)*;
+- **Whiptail** (5ms) cleaves one target for 50-100 hit points. *There is a 20% chance for **DragonBreath** to be used instead *;
+- **DragonBreath** hits all targets for 50-150 hit points.
 
 Necromancer knows 3 spells: 
 

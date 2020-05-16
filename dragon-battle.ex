@@ -8,10 +8,12 @@ defmodule Battle do
         dragonProcess = spawn(Dragon, :battle, [dragonHp, [], [1]])
         Process.register(dragonProcess, :dragonProcess)
         dragonStrategyProcess = spawn(DragonStrategy, :useWhiptail, [])
+        Process.register(dragonStrategyProcess, :dsp)
 
         necromancerProcess = spawn(Necromancer, :battle, [necromancerHp, [], []])
         Process.register(necromancerProcess, :necromancerProcess)
         necromancerStrategyProcess = spawn(NecromancerStrategy, :useSkill, [])
+        Process.register(necromancerStrategyProcess, :nsp)
 
         receive do
             {:gameOver, message } -> 
@@ -28,16 +30,10 @@ defmodule Battle do
     end
 
     def shutdownProcesses(zkList, zaList) do
-        for id <- zkList do
-            Process.exit(Process.whereis(:"ZK_#{id}"), :kill)
-            Process.exit(Process.whereis(:"ZK_SS_#{id}"), :kill)
-        end
-        for id <- zaList do
-            if id != 1 do
-                Process.exit(Process.whereis(:"ZA_#{id}"), :kill)
-                Process.exit(Process.whereis(:"ZA_S_#{id}"), :kill)
-            end
-        end
+        IO.puts "shutting down necromancer strategy process ..."
+        Process.exit(Process.whereis(:nsp), :kill)
+        IO.puts "shutting down dragon strategy process ..."
+        Process.exit(Process.whereis(:dsp), :kill)
     end
 end
 
@@ -53,14 +49,18 @@ defmodule Dragon do
                     IO.puts "The dragon took #{damageTaken} damage, dragon hp remaining: #{dragonHp}"
                 end
                 battle(dragonHp, zkList, zaList)
-            {:characterDead, characterName} ->
+            {:necromancerDead, characterName} ->
                 IO.puts "#{characterName} was defeated!"
-                if(characterName == "Necromancer") do
-                    spawn(Battle, :shutdownProcesses, [zkList, zaList])
-                    send(:parentProcess, {:gameOver, "The dragon won the battle with #{dragonHp} hp remaining!"})
-                else
-                    battle(dragonHp, List.delete(zkList, characterName), List.delete(zaList, characterName))
-                end
+                Battle.shutdownProcesses(zkList, zaList)
+                send(:parentProcess, {:gameOver, "The dragon won the battle with #{dragonHp} hp remaining!"})
+            {:zkDead, zkID} ->
+                IO.puts "ZK_#{zkID} was defeated!"
+                Process.exit(Process.whereis(:"ZK_SS_#{zkID}"), :normal)
+                battle(dragonHp, List.delete(zkList, zkID), zaList)
+            {:zaDead, zaID} ->
+                IO.puts "ZA_#{zaID} was defeated!"
+                Process.exit(Process.whereis(:"ZA_S_#{zaID}"), :normal)
+                battle(dragonHp, zkList, List.delete(zaList, zaID))
             {:updateZkList, newZombieKnight} ->
                 battle(dragonHp, zkList ++ [newZombieKnight], zaList)
             {:updateZaList, newZombieArcher} ->
@@ -86,8 +86,26 @@ defmodule Dragon do
                     IO.puts "Dragon used #{skillName} for #{damage} damage on ZK_#{zkID}"
                 end
                 battle(dragonHp, zkList, zaList)
-            #{:dragonBreath, skillName} ->
+            {:dragonBreath, skillName} ->
+                Enum.each(zkList, fn zkID -> 
+                    getDamage = &(Battle.getDamage/2)
+                    damage = getDamage.(50, 150)
+                    send(:"ZK_#{zkID}", {:info, damage})
+                    IO.puts "Dragon used #{skillName} for #{damage} damage on ZK_#{zkID}"
+                end)
 
+                Enum.each(zaList, fn zaID -> 
+                    getDamage = &(Battle.getDamage/2)
+                    damage = getDamage.(50, 150)
+                    if zaID == 1 do
+                        send(:necromancerProcess, {:info, damage})
+                        IO.puts "Dragon used #{skillName} for #{damage} damage on Necromancer"
+                    else
+                        send(:"ZA_#{zaID}", {:info, damage})
+                        IO.puts "Dragon used #{skillName} for #{damage} damage on ZA_#{zaID}"
+                    end
+                end)
+                battle(dragonHp, zkList, zaList)
         end
     end
 end
@@ -100,8 +118,7 @@ defmodule Necromancer do
             {:info, damageTaken} ->
                 necromancerHp = necromancerHp - damageTaken
                 if necromancerHp <= 0 do 
-                    spawn(Battle, :shutdownProcesses, [zombieKnights, zombieArchers])
-                    send(:dragonProcess, {:characterDead, "Necromancer"})
+                    send(:dragonProcess, {:necromancerDead, "Necromancer"})
                 else
                     IO.puts "The necromancer took #{damageTaken} damage, necromancerHp remaining #{necromancerHp}"
                 end
@@ -109,6 +126,7 @@ defmodule Necromancer do
             {:characterDead, characterName} ->
                 if(characterName == "Dragon") do
                     IO.puts "#{characterName} was defeated!"
+                    Battle.shutdownProcesses(zombieKnights, zombieArchers)
                     send(:parentProcess, {:gameOver, "The necromancer won the battle with #{necromancerHp} hp remaining!"})
                 else
                     battle(necromancerHp, List.delete(zombieKnights, characterName), List.delete(zombieArchers, characterName))
@@ -132,7 +150,6 @@ defmodule Necromancer do
 
                 zombieKnights = zombieKnights ++ [zkID]
                 send(:dragonProcess, {:updateZkList, zkID})
-
                 IO.puts "Necromancer used #{skillName} and has an army size of: #{Enum.count(zombieKnights)} zombie knights and #{Enum.count(zombieArchers)} zombie archers"
                 battle(necromancerHp, zombieKnights, zombieArchers)
             {:summonZombieArcher, skillName} ->
@@ -164,7 +181,15 @@ end
 
 defmodule DragonStrategy do
     def useWhiptail() do
-        send(:dragonProcess, {:whiptail, "whiptail"}) 
+        # There's a 20% chance to use dragonBreath instead of whiptail
+        chance = :rand.uniform(5)
+
+        if chance != 1 do
+            send(:dragonProcess, {:whiptail, "whiptail"}) 
+        else 
+            send(:dragonProcess, {:dragonBreath, "dragon breath"}) 
+        end
+        Process.link(Process.whereis(:dsp))
         Process.sleep(5)
         useWhiptail()
     end
@@ -205,11 +230,10 @@ defmodule ZombieKnight do
                 zombieKnightHp = zombieKnightHp - damageTaken
                 if zombieKnightHp <= 0 do 
                     send(:necromancerProcess, {:characterDead, zkID})
-                    send(:dragonProcess, {:characterDead, zkID})
-                    Process.exit(Process.whereis(:"ZK_#{zkID}"), :info)
-                    Process.exit(Process.whereis(:"ZK_SS_#{zkID}"), :info)
+                    send(:dragonProcess, {:zkDead, zkID})
+                    zombieKnightHp
                 else
-                    IO.puts "ZK_#{zkID} took #{damageTaken} damage, ZK_#{zkID} has #{zombieKnightHp} remaining"
+                    IO.puts "ZK_#{zkID} took #{damageTaken} damage, ZK_#{zkID} has #{zombieKnightHp} hp remaining"
                     battle(zombieKnightHp, zkID)
                 end
         end
@@ -220,6 +244,7 @@ defmodule ZombieKnight do
         damage = getDamage.(20, 50)
         send(:dragonProcess, {:info, damage})
         IO.puts "Zombie knight #{zkID} used sword slash for #{damage} damage"
+        Process.link(Process.whereis(:nsp))
         Process.sleep(5)
         useSwordSlash(zkID)
     end
@@ -232,11 +257,9 @@ defmodule ZombieArcher do
                 zombieArcherHp = zombieArcherHp - damageTaken
                 if zombieArcherHp <= 0 do 
                     send(:necromancerProcess, {:characterDead, zaID})
-                    send(:dragonProcess, {:characterDead, zaID})
-                    Process.exit(Process.whereis(:"ZA_#{zaID}"), :info)
-                    Process.exit(Process.whereis(:"ZA_S_#{zaID}"), :info)
+                    send(:dragonProcess, {:zaDead, zaID})
                 else
-                    IO.puts "ZA_#{zaID} took #{damageTaken} damage, ZA_#{zaID} has #{zombieArcherHp} remaining"
+                    IO.puts "ZA_#{zaID} took #{damageTaken} damage, ZA_#{zaID} has #{zombieArcherHp} hp remaining"
                     battle(zombieArcherHp, zaID)
                 end
         end
@@ -247,6 +270,7 @@ defmodule ZombieArcher do
         damage = getDamage.(100, 200)
         send(:dragonProcess, {:info, damage})
         IO.puts "Zombie archer #{zaID} used shot for #{damage} damage"
+        Process.link(Process.whereis(:nsp))
         Process.sleep(10)
         useShot(zaID)
     end
