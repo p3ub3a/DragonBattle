@@ -1,7 +1,7 @@
 defmodule Battle do
     def start do 
-        necromancerHp = 10000
-        dragonHp = 1000000
+        necromancerHp = 1000
+        dragonHp = 10000
 
         Process.register(self(), :parentProcess)
 
@@ -22,6 +22,7 @@ defmodule Battle do
                 Process.exit(necromancerProcess, :gameOver)
                 Process.exit(necromancerStrategyProcess, :gameOver)
                 IO.puts "#{message}"
+                Process.exit(self(), :gameOver)
         end
     end
 
@@ -82,27 +83,34 @@ defmodule Dragon do
                     end
                 else
                     zkID = Enum.random(zkList)
-                    send(:"ZK_#{zkID}", {:info, damage})
-                    IO.puts "Dragon used #{skillName} for #{damage} damage on ZK_#{zkID}"
+                    if Process.whereis(:"ZK_#{zkID}") != nil do
+                        
+                        send(:"ZK_#{zkID}", {:info, damage})
+                        IO.puts "Dragon used #{skillName} for #{damage} damage on ZK_#{zkID}"
+                    end
                 end
                 battle(dragonHp, zkList, zaList)
             {:dragonBreath, skillName} ->
                 Enum.each(zkList, fn zkID -> 
-                    getDamage = &(Battle.getDamage/2)
-                    damage = getDamage.(50, 150)
-                    send(:"ZK_#{zkID}", {:info, damage})
-                    IO.puts "Dragon used #{skillName} for #{damage} damage on ZK_#{zkID}"
+                    if Process.whereis(:"ZK_#{zkID}") != nil do
+                        getDamage = &(Battle.getDamage/2)
+                        damage = getDamage.(50, 150)
+                        send(:"ZK_#{zkID}", {:info, damage})
+                        IO.puts "Dragon used #{skillName} for #{damage} damage on ZK_#{zkID}"
+                    end
                 end)
 
                 Enum.each(zaList, fn zaID -> 
-                    getDamage = &(Battle.getDamage/2)
-                    damage = getDamage.(50, 150)
-                    if zaID == 1 do
-                        send(:necromancerProcess, {:info, damage})
-                        IO.puts "Dragon used #{skillName} for #{damage} damage on Necromancer"
-                    else
-                        send(:"ZA_#{zaID}", {:info, damage})
-                        IO.puts "Dragon used #{skillName} for #{damage} damage on ZA_#{zaID}"
+                    if Process.whereis(:"ZA_#{zaID}") != nil do
+                        getDamage = &(Battle.getDamage/2)
+                        damage = getDamage.(50, 150)
+                        if zaID == 1 do
+                            send(:necromancerProcess, {:info, damage})
+                            IO.puts "Dragon used #{skillName} for #{damage} damage on Necromancer"
+                        else
+                            send(:"ZA_#{zaID}", {:info, damage})
+                            IO.puts "Dragon used #{skillName} for #{damage} damage on ZA_#{zaID}"
+                        end
                     end
                 end)
                 battle(dragonHp, zkList, zaList)
@@ -190,7 +198,7 @@ defmodule DragonStrategy do
             send(:dragonProcess, {:dragonBreath, "dragon breath"}) 
         end
         Process.link(Process.whereis(:dsp))
-        Process.sleep(5)
+        Process.sleep(80)
         useWhiptail()
     end
 end
@@ -199,9 +207,15 @@ defmodule NecromancerStrategy do
     def useSkill() do
         skillNr = :rand.uniform(3)
         case skillNr do
-            1 -> useAntiZombieBolt()
-            2 -> summonZombieKnight()
-            3 -> summonZombieArcher()
+            1 -> 
+                useAntiZombieBolt()
+                Process.sleep(120)
+            2 -> 
+                summonZombieKnight()
+                Process.sleep(500)
+            3 -> 
+                summonZombieArcher()
+                Process.sleep(700)
             _ -> "invalid skill number"
         end
         useSkill()
@@ -209,17 +223,14 @@ defmodule NecromancerStrategy do
 
     def useAntiZombieBolt() do
         send(:necromancerProcess, {:antiZombieBolt, "anti zombie bolt"}) 
-        Process.sleep(12)
     end
 
     def summonZombieKnight() do
         send(:necromancerProcess, {:summonZombieKnight, "summon zombie knight"}) 
-        Process.sleep(20)
     end
 
     def summonZombieArcher() do
         send(:necromancerProcess, {:summonZombieArcher, "summon zombie archer"}) 
-        Process.sleep(20)
     end
 end
 
@@ -245,7 +256,7 @@ defmodule ZombieKnight do
         send(:dragonProcess, {:info, damage})
         IO.puts "Zombie knight #{zkID} used sword slash for #{damage} damage"
         Process.link(Process.whereis(:nsp))
-        Process.sleep(5)
+        Process.sleep(100)
         useSwordSlash(zkID)
     end
 end
@@ -271,7 +282,7 @@ defmodule ZombieArcher do
         send(:dragonProcess, {:info, damage})
         IO.puts "Zombie archer #{zaID} used shot for #{damage} damage"
         Process.link(Process.whereis(:nsp))
-        Process.sleep(10)
+        Process.sleep(300)
         useShot(zaID)
     end
 end
