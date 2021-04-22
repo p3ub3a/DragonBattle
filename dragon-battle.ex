@@ -1,7 +1,7 @@
 defmodule Battle do
     def start do 
-        necromancerHp = 1000
-        dragonHp = 10000
+        necromancerHp = 3700
+        dragonHp = 100000
 
         Process.register(self(), :parentProcess)
 
@@ -158,7 +158,8 @@ defmodule Necromancer do
 
                 zombieKnights = zombieKnights ++ [zkID]
                 send(:dragonProcess, {:updateZkList, zkID})
-                IO.puts "Necromancer used #{skillName} and has an army size of: #{Enum.count(zombieKnights)} zombie knights and #{Enum.count(zombieArchers)} zombie archers"
+                IO.puts "Necromancer used #{skillName} to summon ZK_#{zkID} with skill ZK_SS_#{zkID}"
+                # IO.puts "Necromancer used #{skillName} and has an army size of: #{Enum.count(zombieKnights)} zombie knights and #{Enum.count(zombieArchers)} zombie archers"
                 battle(necromancerHp, zombieKnights, zombieArchers)
             {:summonZombieArcher, skillName} ->
                 zombieArcherHp = 100
@@ -171,8 +172,8 @@ defmodule Necromancer do
 
                 zombieArchers = zombieArchers ++ [zaID]
                 send(:dragonProcess, {:updateZaList, zaID})
-
-                IO.puts "Necromancer used #{skillName} and has an army size of: #{Enum.count(zombieKnights)} zombie knights and #{Enum.count(zombieArchers)} zombie archers"
+                IO.puts "Necromancer used #{skillName} to summon ZA_#{zaID} with skill ZA_S_#{zaID}"
+                # IO.puts "Necromancer used #{skillName} and has an army size of: #{Enum.count(zombieKnights)} zombie knights and #{Enum.count(zombieArchers)} zombie archers"
                 battle(necromancerHp, zombieKnights, zombieArchers)
         end
     end
@@ -212,10 +213,10 @@ defmodule NecromancerStrategy do
                 Process.sleep(120)
             2 -> 
                 summonZombieKnight()
-                Process.sleep(500)
+                Process.sleep(400)
             3 -> 
                 summonZombieArcher()
-                Process.sleep(700)
+                Process.sleep(600)
             _ -> "invalid skill number"
         end
         useSkill()
